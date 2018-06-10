@@ -1,12 +1,8 @@
 About
 
-This is a non-official implementation of vector autoregression which runs on Spark 1.6 and higher. It runs on spark-shell and you have to make the approprite changes
-and JAR conversion if you want to use it on cluster mode.
+This is a non-official implementation of vector autoregression which runs on Spark 1.6 and higher. It runs on spark-shell and you have to make the approprite changes and JAR conversion if you want to use it on cluster mode.
 
-This implementation is based on the R implementation of Vector Autoregression (VAR), however IT IS NOT THE FULL IMPLEMENTATION. In particular, the exogenous option
-is not available. Also, both intercept and trend are included, so it's not possible to choose either one of them or none. The lag selection is based only on
-Akaike criteria, so it's not possible to choose distinct criteria. Furthermore, the forecast does not contain
-confidence levels
+This implementation is based on the R implementation of Vector Autoregression (VAR), however IT IS NOT THE FULL IMPLEMENTATION. In particular, the exogenous option is not available. Also, both intercept and trend are included, so it's not possible to choose either one of them or none. The lag selection is based only on Akaike criteria, so it's not possible to choose distinct criteria. Furthermore, the forecast does not contain confidence levels
 
 This implementation is the equivalent of the following line in R:
 
