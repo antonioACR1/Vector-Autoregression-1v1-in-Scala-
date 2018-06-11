@@ -13,86 +13,84 @@ import scala.util.{Try,Success,Failure}
 
 object varModel extends java.io.Serializable {
 def lagSelection(df:Array[Array[Double]],maxLag:Int,season:Option[Int]) : (Int,Array[Double])={ 
-val K : Int = df(0).size
-val nObs : Int = df.size
-/*to get labels for each variable*/
-/*drop first maxLag observations, convert to dense matrix. These are the target variables when doing a loop of linear regressions*/
-val yendogArr=df.drop(maxLag)
-val yendog=DenseMatrix(yendogArr.map(_.toArray):_*) 
-/*construct the matrix of shifts of lag equal to maxLag+1. Each shift will have length nObs-lag+1. Then convert to dense matrix */
-val lag : Int =maxLag + 1
-val ylaggedFull=fixedlagMatTrimBothArr(df,lag)
-val ylaggedDM=DenseMatrix(ylaggedFull.map(_.toArray):_*) /*embed in R*/
-/*prepare the dataset for the linear regressions. It will be either 1 column per variable, 2 columns per variable,e tc. which are taken from the yLagged to be defined */
-val ylaggedFullColIndexes=(0 to ylaggedFull(0).size-1).toList
-val yLagged=ylaggedDM(::,ylaggedFullColIndexes.diff(jumping(ylaggedFullColIndexes.size,0,K))) /*ylagged in R*/
+  val K : Int = df(0).size
+  val nObs : Int = df.size
+  /*to get labels for each variable*/
+  /*drop first maxLag observations, convert to dense matrix. These are the target variables when doing a loop of linear regressions*/
+  val yendogArr=df.drop(maxLag)
+  val yendog=DenseMatrix(yendogArr.map(_.toArray):_*) 
+  /*construct the matrix of shifts of lag equal to maxLag+1. Each shift will have length nObs-lag+1. Then convert to dense matrix */
+  val lag : Int =maxLag + 1
+  val ylaggedFull=fixedlagMatTrimBothArr(df,lag)
+  val ylaggedDM=DenseMatrix(ylaggedFull.map(_.toArray):_*) /*embed in R*/
+  /*prepare the dataset for the linear regressions. It will be either 1 column per variable, 2 columns per variable,e tc. which are taken from the yLagged to be defined */
+  val ylaggedFullColIndexes=(0 to ylaggedFull(0).size-1).toList
+  val yLagged=ylaggedDM(::,ylaggedFullColIndexes.diff(jumping(ylaggedFullColIndexes.size,0,K))) /*ylagged in R*/
 
-/*number of observations in ylaggedFull (sample is equal to the shift size)*/
-val sample : Double =ylaggedFull.size.toDouble
+  /*number of observations in ylaggedFull (sample is equal to the shift size)*/
+  val sample : Double =ylaggedFull.size.toDouble
 
-/*rhs construction*/
-val intercept=DenseMatrix(Array.fill(sample.toInt)(1.0))
-val trend=DenseMatrix(((maxLag+1) to (maxLag+sample.toInt) by 1).toArray.map(_.toDouble))
-var rhs=DenseMatrix.horzcat(intercept.t,trend.t)
+  /*rhs construction*/
+  val intercept=DenseMatrix(Array.fill(sample.toInt)(1.0))
+  val trend=DenseMatrix(((maxLag+1) to (maxLag+sample.toInt) by 1).toArray.map(_.toDouble))
+  var rhs=DenseMatrix.horzcat(intercept.t,trend.t)
 
-if(season.isDefined){
-val seasonValue=season.get
-val a=diag(DenseVector.fill(seasonValue){1.0})
-val b=new DenseMatrix(seasonValue,seasonValue,DenseVector.fill(seasonValue*seasonValue){1.0}.toArray)*(1/seasonValue.toDouble)
-val c=a-b
-var cVar=c
-while(cVar(::,0).size <= sample){
-cVar=DenseMatrix.vertcat(cVar,c);
-}
-cVar=cVar(0 to (sample.toInt-1),0 to seasonValue-2)
-rhs=DenseMatrix.horzcat(rhs,cVar)
-}
+  if(season.isDefined){
+    val seasonValue=season.get
+    val a=diag(DenseVector.fill(seasonValue){1.0})
+    val b=new DenseMatrix(seasonValue,seasonValue,DenseVector.fill(seasonValue*seasonValue){1.0}.toArray)*(1/seasonValue.toDouble)
+    val c=a-b
+    var cVar=c
+    while(cVar(::,0).size <= sample){
+    cVar=DenseMatrix.vertcat(cVar,c);
+    }
+    cVar=cVar(0 to (sample.toInt-1),0 to seasonValue-2)
+    rhs=DenseMatrix.horzcat(rhs,cVar)
+  }
 
-/*cache, persist,broadcast the variable yLaggedDM??*/
-val yLaggedDM=DenseMatrix(MatrixUtil.matToRowArrs(yLagged).map(_.toArray):_*) /*ylagged as dense matrix (yLagged is a sliced dense matrix)*/
+  /*cache, persist,broadcast the variable yLaggedDM??*/
+  val yLaggedDM=DenseMatrix(MatrixUtil.matToRowArrs(yLagged).map(_.toArray):_*) /*ylagged as dense matrix (yLagged is a sliced dense matrix)*/
 
-val yLaggedArr=MatrixUtil.matToRowArrs(yLagged) /*yLagged as array of arrays*/
-val detint : Int = rhs.cols
+  val yLaggedArr=MatrixUtil.matToRowArrs(yLagged) /*yLagged as array of arrays*/
+  val detint : Int = rhs.cols
 
-/*Akaike criteria*/
-val sizeJump : Int =yLaggedArr(0).size
-var AICArr=Array[Double]()
-/*loop of regressions*/
-for (i<-0 to maxLag-1){
-var mVar=Array[Array[Double]]()
-for(j<-0 to K-1){
-val regression=new OLSMultipleLinearRegression()
-regression.setNoIntercept(true)
-/*target variable*/
-val y=yendog(::,j).toArray
-/*REVIEW, two possible exceptions come from 1) when transpose of X times X is not invertible, and 2) X has more columns than observations*/
-/*construction of explanatory variables (a concatenation of incompleteX (1 column per variable or 2 columns per variable or 3 columsn per variable or etc) and rhs)*/
-val colIndexCase=jumping(sizeJump,i,K)
-val incompleteX=MatrixUtil.matToRowArrs(yLaggedDM(::,colIndexCase))
-val incompleteXDM=DenseMatrix(incompleteX.map(_.toArray):_*)
-/*concatenate with rhs to get the full explanatory variables*/
-val almostX=DenseMatrix.horzcat(incompleteXDM,rhs)
-val X=MatrixUtil.matToRowArrs(almostX)
-/*apply regression model to get errors*/
-val params=Try{regression.newSampleData(y,X)} match {case
-Success(_)=>regression.estimateResiduals() /*this should be Array[Double]*/
-case Failure(_)=>Array.fill(X(0).size)(0.0)
-}
-/*matrix creation*/
-mVar=mVar:+params
-} /*end of j's loop*/
-
-/*outside of the j's*/
-val mCoeff=DenseMatrix(mVar.map(_.toArray):_*)
-/*covariance matrix*/
-val detSigma=det((mCoeff*mCoeff.t):*(1/sample)) /*this value depends on mCoeff*/
-val iValue=log(detSigma)+(2/sample)*((i+1)*K*K+K*detint)
-AICArr=AICArr:+iValue  
-} /*end of i's loop*/
-val selectedLagLong=AICArr.zipWithIndex.min._2
-/*REVIEW*/
-val selectedLag=selectedLagLong.toInt
-(selectedLag,AICArr)
+   /*Akaike criteria*/
+  val sizeJump : Int =yLaggedArr(0).size
+  var AICArr=Array[Double]()
+  /*loop of regressions*/
+  for (i<-0 to maxLag-1){
+    var mVar=Array[Array[Double]]()
+      for(j<-0 to K-1){
+        val regression=new OLSMultipleLinearRegression()
+        regression.setNoIntercept(true)
+        /*target variable*/
+        val y=yendog(::,j).toArray
+        /*REVIEW, two possible exceptions come from 1) when transpose of X times X is not invertible, and 2) X has more columns than observations*/
+        /*construction of explanatory variables (a concatenation of incompleteX (1 column per variable or 2 columns per variable or 3 columsn per variable or etc) and rhs)*/
+        val colIndexCase=jumping(sizeJump,i,K)
+        val incompleteX=MatrixUtil.matToRowArrs(yLaggedDM(::,colIndexCase))
+        val incompleteXDM=DenseMatrix(incompleteX.map(_.toArray):_*)
+        /*concatenate with rhs to get the full explanatory variables*/
+        val almostX=DenseMatrix.horzcat(incompleteXDM,rhs)
+        val X=MatrixUtil.matToRowArrs(almostX)
+        /*apply regression model to get errors*/
+        val params=Try{regression.newSampleData(y,X)} match {case
+          Success(_)=>regression.estimateResiduals() /*this should be Array[Double]*/
+          case Failure(_)=>Array.fill(X(0).size)(0.0)
+        }
+        /*matrix creation*/
+        mVar=mVar:+params
+      } 
+    val mCoeff=DenseMatrix(mVar.map(_.toArray):_*)
+    /*covariance matrix*/
+    val detSigma=det((mCoeff*mCoeff.t):*(1/sample)) /*this value depends on mCoeff*/
+    val iValue=log(detSigma)+(2/sample)*((i+1)*K*K+K*detint)
+    AICArr=AICArr:+iValue  
+  } /*end of i's loop*/
+  val selectedLagLong=AICArr.zipWithIndex.min._2
+  /*REVIEW*/
+  val selectedLag=selectedLagLong.toInt
+  (selectedLag,AICArr)
 }
 
 def fit(df:Array[Array[Double]],maxLag:Int,season:Option[Int]):(breeze.linalg.DenseMatrix[Double],Int)={
