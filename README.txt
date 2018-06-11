@@ -36,7 +36,7 @@ To train the model, type
 
 val model=varModel.fit(df,maxLag,season)
 
-If you want your own p, type instead
+If you want your own p instead of the one provided by the Akaike criteria, type instead
 
 val model=varModel.fit(df,p,season)
 
