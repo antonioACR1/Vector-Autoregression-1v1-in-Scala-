@@ -42,7 +42,7 @@ val model=varModel.fit(df,p,season)
 
 To predict say 12 values ahead, type
 
-val prediction=varModel.predict(model._1,n.ahead=12,df,model._2,season)
+val prediction=varModel.predict(model._1,nAhead=12,df,model._2,season)
 
 To get the errors of the model, type
 
