@@ -24,7 +24,7 @@ val df=Array(Array(1.0,11.0),Array(2.0,12.0),Array(3.0,13.0),Array(4.0,14.0),Arr
 
 Set the maximum lag and the season 
 val maxLag=2
-val season=Some(4)
+val season=Some(2)
 
 In case you don't want to use season, set season=None
 
