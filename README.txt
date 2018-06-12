@@ -16,7 +16,7 @@ It is possible to use the parameter p instead of lag.max by using directly the f
 
 Example usage
 
-In the spark-shell, run the files in the required libraries folder. Then run the file in the vector autoregression folder.
+In the spark-shell, run the files in the required libraries folder (first Matrixutil and then Lag). Then run the file in the vector autoregression folder.
 
 Once you have done this, your time series should be in the format Array[Array[Double]], for example:
 
