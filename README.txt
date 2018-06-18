@@ -1,4 +1,4 @@
-**About**
+About
 
 This is a non-official implementation of multivariate vector autoregression which runs on Spark 1.6 and higher. It runs on spark-shell and you have to make the approprite changes and JAR conversion if you want to use it on cluster mode.
 
