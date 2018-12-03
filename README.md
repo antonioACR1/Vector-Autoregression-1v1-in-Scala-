@@ -6,7 +6,7 @@
 
 This implementation is based on the R implementation of Vector Autoregression (VAR). Notice, however, that some options from the R implementation are not available here, for example the exogenous option is not available. Also, both intercept and trend are included, so it's not possible to choose either one of them or none. The lag selection is based only on Akaike criteria, so it's not possible to choose another criteria. Furthermore, the forecast does not include confidence levels.
 
-### In case someone is interested, I'm currently working on an update which I expect to finish by December 2018. This will include the exogenous option, the remaining criterias and the confidence levels. This update will be given as a class instead of an object too. 
+### In case someone is interested, I'm currently working on an update which I expect to finish by (the end of!) December 2018. This will include the exogenous option, the remaining criterias and the confidence levels. This update will be given as a class instead of an object too. 
 
 ## Usage
 
